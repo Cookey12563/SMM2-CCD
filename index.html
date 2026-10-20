@@ -1,0 +1,2135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comic Creator</title>
+
+<style>
+/* =========================================================
+   THEME AND BASE
+   ========================================================= */
+
+:root {
+  --ink: #273246;
+  --yellow: #ffd344;
+  --cream: #fff8e7;
+  --slider-head-width: 40px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background: #344157;
+  color: var(--ink);
+  font-family: "Trebuchet MS", system-ui, sans-serif;
+}
+
+button {
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 3px solid var(--ink);
+  border-radius: 11px;
+  background: var(--cream);
+  color: var(--ink);
+  font: 800 14px "Trebuchet MS", system-ui, sans-serif;
+  box-shadow: 0 4px var(--ink);
+  cursor: pointer;
+  transition: transform 110ms, box-shadow 110ms, background 150ms;
+}
+
+button:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 1px var(--ink);
+}
+
+button:disabled {
+  opacity: .4;
+  box-shadow: none;
+  cursor: default;
+}
+
+button:focus-visible,
+input:focus-visible,
+.viewport:focus-visible,
+.right-panel:focus-visible {
+  outline: 3px solid #1685ef;
+  outline-offset: 3px;
+}
+
+[hidden] { display: none !important; }
+
+.app {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* =========================================================
+   TOP BLOCK BAR
+   No scrollbar. Selected blocks replace visible slots.
+   ========================================================= */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 0 0 auto;
+  min-width: 0;
+  padding: 12px 18px 18px;
+  background: var(--yellow);
+  border-bottom: 4px solid var(--ink);
+  box-shadow: inset 0 -5px #eab52a;
+}
+
+.palette {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  height: 62px;
+  gap: 14px;
+  padding: 7px;
+  overflow: hidden;
+}
+
+.swatch {
+  display: grid;
+  place-items: center;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 3px;
+  overflow: hidden;
+  background: #fff9e8;
+  touch-action: none;
+}
+
+.swatch[aria-pressed="true"] {
+  outline: 3px solid var(--ink);
+  outline-offset: 4px;
+  transform: translateY(-2px);
+}
+
+.tile-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  pointer-events: none;
+  user-select: none;
+}
+
+#more-blocks { flex: 0 0 auto; }
+
+/* =========================================================
+   WORKSPACE
+   ========================================================= */
+
+.editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 226px;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.workspace {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  padding: 20px;
+  overflow: hidden;
+  background-image: radial-gradient(#526078 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+.canvas-frame {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 4px solid #202a3b;
+  border-radius: 12px;
+  background: #abb6c8;
+  box-shadow: 0 7px #253044;
+}
+
+.viewport {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 14px;
+  background: #abb6c8;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+
+.viewport::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+canvas {
+  display: block;
+  width: 3840px;
+  height: 432px;
+  max-width: none;
+  background: white;
+  touch-action: none;
+  image-rendering: pixelated;
+  cursor: crosshair;
+}
+
+/* =========================================================
+   SLIDER TRAY
+   ========================================================= */
+
+.slider-tray {
+  display: grid;
+  grid-template-rows: 0fr;
+  flex: 0 0 auto;
+  min-height: 0;
+  opacity: 0;
+  visibility: hidden;
+  background: #283348;
+  transition:
+    grid-template-rows 320ms cubic-bezier(.22, 1, .36, 1),
+    opacity 180ms ease,
+    visibility 0s linear 320ms;
+}
+
+.slider-tray.open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  visibility: visible;
+  transition:
+    grid-template-rows 320ms cubic-bezier(.22, 1, .36, 1),
+    opacity 180ms ease 70ms,
+    visibility 0s;
+}
+
+.slider-inner { min-height: 0; overflow: hidden; }
+
+.slider-content {
+  padding: 12px 16px;
+  border-top: 3px solid #202a3b;
+}
+
+.range-shell { position: relative; height: 30px; }
+
+/* Inset rounded ends stay covered by the head at both limits. */
+.range-shell::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: calc(var(--slider-head-width) / 2);
+  right: calc(var(--slider-head-width) / 2);
+  height: 10px;
+  transform: translateY(-50%);
+  border: 2px solid #172132;
+  border-radius: 999px;
+  background: #64748e;
+  pointer-events: none;
+}
+
+.canvas-slider {
+  position: relative;
+  z-index: 1;
+  display: block;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 30px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  touch-action: pan-y;
+}
+
+.canvas-slider::-webkit-slider-runnable-track {
+  height: 10px;
+  border: 0;
+  background: transparent;
+}
+
+.canvas-slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  width: var(--slider-head-width);
+  height: 26px;
+  margin-top: -8px;
+  border: 3px solid #202a3b;
+  border-radius: 8px;
+  background:
+    linear-gradient(#7d5e16, #7d5e16)
+      calc(50% - 6px) center / 2px 10px no-repeat,
+    linear-gradient(#7d5e16, #7d5e16)
+      center / 2px 10px no-repeat,
+    linear-gradient(#7d5e16, #7d5e16)
+      calc(50% + 6px) center / 2px 10px no-repeat,
+    var(--yellow);
+  box-shadow: 0 2px #172132;
+}
+
+.canvas-slider::-moz-range-track {
+  height: 10px;
+  border: 0;
+  background: transparent;
+}
+
+.canvas-slider::-moz-range-thumb {
+  box-sizing: border-box;
+  width: var(--slider-head-width);
+  height: 26px;
+  border: 3px solid #202a3b;
+  border-radius: 8px;
+  background:
+    linear-gradient(#7d5e16, #7d5e16)
+      calc(50% - 6px) center / 2px 10px no-repeat,
+    linear-gradient(#7d5e16, #7d5e16)
+      center / 2px 10px no-repeat,
+    linear-gradient(#7d5e16, #7d5e16)
+      calc(50% + 6px) center / 2px 10px no-repeat,
+    var(--yellow);
+  box-shadow: 0 2px #172132;
+}
+
+.canvas-slider::-moz-range-progress { background: transparent; }
+.canvas-slider:disabled { opacity: .45; }
+
+/* =========================================================
+   RIGHT PANEL AND LAYERS
+   ========================================================= */
+
+.right-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 20px 14px;
+  border-left: 4px solid #202a3b;
+  background: var(--cream);
+  overscroll-behavior: contain;
+}
+
+.right-panel > * { flex-shrink: 0; }
+
+.button-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+.button-row button { padding: 10px 4px; }
+#tray-toggle { background: var(--yellow); }
+#paint[aria-pressed="true"] { background: var(--yellow); }
+#eraser[aria-pressed="true"] { background: #ffadcf; }
+#clear { background: #f04444; color: white; }
+#clear:hover { background: #dc3030; }
+#save { background: #63d58c; }
+
+.grid-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.grid-toggle input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: #d9a313;
+}
+
+.layers-panel {
+  padding-top: 12px;
+  border-top: 2px solid #d8cfbb;
+}
+
+.layers-panel h2 { margin: 0 0 12px; font-size: 17px; }
+
+.layer-actions {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 13px;
+}
+
+.layer-actions button { padding: 7px 2px; font-size: 18px; }
+
+.layer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.layer-item {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border: 2px solid #c8c0af;
+  border-radius: 10px;
+  background: #fffdf6;
+}
+
+.layer-item.active {
+  border-color: var(--ink);
+  background: #ffe895;
+}
+
+.layer-item.layer-hidden .layer-name { opacity: .55; }
+
+.layer-eye {
+  min-height: 32px;
+  height: 32px;
+  padding: 0;
+  border-width: 2px;
+  border-radius: 7px;
+  box-shadow: none;
+  font-size: 15px;
+}
+
+.layer-name {
+  min-width: 0;
+  min-height: 34px;
+  padding: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+  font-size: 12px;
+}
+
+.layer-name:active:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+}
+
+#rename-layer {
+  width: 100%;
+  margin-top: 12px;
+  font-size: 12px;
+}
+
+#layer-name-input {
+  width: 100%;
+  min-height: 40px;
+  margin-top: 10px;
+  padding: 8px;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+}
+
+/* =========================================================
+   BLOCK PICKER
+   ========================================================= */
+
+.blocks-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: #162033b8;
+  backdrop-filter: blur(3px);
+}
+
+.blocks-window {
+  display: flex;
+  flex-direction: column;
+  width: min(920px, 100%);
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border: 4px solid #202a3b;
+  border-radius: 18px;
+  background: var(--cream);
+  box-shadow: 0 10px #14203380;
+  animation: window-enter 200ms cubic-bezier(.2, .8, .25, 1.15);
+}
+
+.blocks-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 0 0 auto;
+  gap: 12px;
+  padding: 15px 20px 19px;
+  border-bottom: 4px solid var(--ink);
+  background: var(--yellow);
+  box-shadow: inset 0 -5px #eab52a;
+}
+
+.blocks-header h2 { margin: 0; font-size: 23px; }
+#close-blocks { width: 44px; padding: 5px; font-size: 23px; }
+
+.blocks-grid-area {
+  min-height: 0;
+  overflow: auto;
+  padding: 22px;
+  background-color: #37465e;
+  background-image:
+    linear-gradient(#ffffff08 1px, transparent 1px),
+    linear-gradient(90deg, #ffffff08 1px, transparent 1px);
+  background-size: 24px 24px;
+  overscroll-behavior: contain;
+}
+
+.blocks-grid {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.block-slot {
+  position: relative;
+  min-width: 0;
+  min-height: 44px;
+  aspect-ratio: 1;
+  padding: 7px;
+  border: 3px solid #1d293d;
+  border-radius: 12px;
+  background: #e7e9eb;
+  box-shadow: 0 4px #1d293d;
+}
+
+.block-slot:hover { background: #fff4b6; }
+
+.block-slot[aria-pressed="true"] {
+  outline: 3px solid var(--yellow);
+  outline-offset: 3px;
+  background: var(--yellow);
+}
+
+.block-slot[aria-pressed="true"]::after {
+  content: "✓";
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: var(--yellow);
+  font-size: 14px;
+}
+
+.missing-tile {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  background: #e7a9bc;
+  color: #582539;
+  font-size: 11px;
+}
+
+@keyframes window-enter {
+  from { opacity: 0; transform: translateY(12px) scale(.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* =========================================================
+   CUSTOM CURSOR
+   ========================================================= */
+
+html.custom-cursor,
+html.custom-cursor * { cursor: none !important; }
+
+#cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  z-index: 2147483647;
+  pointer-events: none;
+  visibility: hidden;
+  will-change: transform;
+}
+
+#cursor.visible { visibility: visible; }
+
+.cursor-art {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  left: calc(-1px * var(--hot-x, 2));
+  top: calc(-1px * var(--hot-y, 2));
+  transform-origin:
+    calc(1px * var(--hot-x, 2))
+    calc(1px * var(--hot-y, 2));
+  transition: transform 160ms cubic-bezier(.2, .8, .25, 1.4);
+  filter: drop-shadow(1px 3px 1px #17213350);
+}
+
+.cursor-image {
+  display: none;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.cursor-image.active { display: block; }
+#cursor.pressed .cursor-art { transform: rotate(-7deg) scale(.86); }
+#cursor.drawing .cursor-art { transform: rotate(-12deg) scale(.92); }
+
+.cursor-fallback {
+  display: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  border-top: 23px solid #273246;
+  border-right: 15px solid transparent;
+  filter: drop-shadow(1px 1px 0 white);
+}
+
+#cursor.pressed .cursor-art,
+#cursor.drawing .cursor-art {
+  transform: none;
+}
+
+/* =========================================================
+   RESPONSIVE SETTINGS
+   ========================================================= */
+
+@media (max-width: 640px) {
+  .topbar { padding: 8px 10px 14px; gap: 10px; }
+  .palette { gap: 12px; height: 54px; }
+  .swatch {
+    flex-basis: 36px;
+    width: 36px;
+    height: 36px;
+    min-height: 36px;
+  }
+  #more-blocks { padding: 9px; font-size: 12px; }
+  .editor { grid-template-columns: minmax(0, 1fr) 142px; }
+  .workspace { padding: 12px 8px; }
+  .viewport { padding: 10px; }
+  .right-panel { padding: 14px 8px; gap: 12px; }
+  .right-panel button { font-size: 12px; }
+  .button-row { gap: 6px; }
+  .button-row button { padding: 10px 2px; }
+  .grid-toggle { font-size: 12px; }
+  .slider-content { padding: 10px 8px; }
+  .blocks-overlay { padding: 10px; }
+  .blocks-header { padding: 12px 14px 16px; }
+  .blocks-grid-area { padding: 15px; }
+  .blocks-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 11px;
+  }
+  .layer-item {
+    grid-template-columns: 27px minmax(0, 1fr);
+    padding: 4px;
+    gap: 3px;
+  }
+  .layer-eye { width: 27px; }
+}
+
+@media (max-height: 450px) {
+  .topbar { padding-top: 3px; padding-bottom: 8px; }
+  .palette { height: 50px; }
+  .swatch {
+    flex-basis: 32px;
+    width: 32px;
+    height: 32px;
+    min-height: 32px;
+  }
+  .workspace { padding: 8px; }
+  .right-panel { padding-top: 10px; padding-bottom: 10px; }
+  .slider-content { padding-top: 7px; padding-bottom: 7px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+/* Keep the cursor images pixel-sharp when resized. */
+.cursor-image {
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+}
+
+/* Remove the blurred shadow around the hand. */
+.cursor-art {
+  filter: none;
+}
+</style>
+</head>
+
+<body>
+<div class="app" id="app">
+  <div class="topbar">
+    <div class="palette" role="group" aria-label="Quick blocks"></div>
+
+    <button
+      id="more-blocks"
+      type="button"
+      aria-haspopup="dialog"
+      aria-controls="blocks-dialog"
+      aria-expanded="false"
+    >View more blocks</button>
+  </div>
+
+  <div class="editor">
+    <main class="workspace">
+      <div class="canvas-frame">
+        <div
+          class="viewport"
+          tabindex="0"
+          role="region"
+          aria-label="Scrollable drawing workspace"
+        >
+          <canvas width="3840" height="432" aria-label="Comic canvas"></canvas>
+        </div>
+
+        <div class="slider-tray" id="slider-tray" aria-hidden="true" inert>
+          <div class="slider-inner">
+            <div class="slider-content">
+              <div class="range-shell">
+                <input
+                  id="canvas-slider"
+                  class="canvas-slider"
+                  type="range"
+                  min="0"
+                  max="0"
+                  value="0"
+                  step="1"
+                  tabindex="-1"
+                  aria-label="Scroll canvas horizontally"
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <aside class="right-panel" aria-label="Editor controls" tabindex="0">
+      <div class="button-row">
+        <button id="undo" type="button" title="Ctrl or Command + Z">↶ Undo</button>
+        <button id="redo" type="button" title="Ctrl or Command + Shift + Z">↷ Redo</button>
+      </div>
+
+      <div class="button-row">
+        <button id="paint" type="button" aria-pressed="true">Draw</button>
+        <button id="eraser" type="button" aria-pressed="false">Eraser</button>
+      </div>
+
+      <button
+        id="tray-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-controls="slider-tray"
+      >Tray</button>
+
+      <button id="clear" type="button" title="Clear the selected layer">
+        Clear layer
+      </button>
+
+      <label class="grid-toggle">
+        <input id="guides" type="checkbox" checked>
+        Show grid
+      </label>
+
+      <button id="save" type="button">↓ Export PNG</button>
+
+      <section class="layers-panel" aria-labelledby="layers-title">
+        <h2 id="layers-title">Layers</h2>
+
+        <div class="layer-actions">
+          <button id="add-layer" type="button" aria-label="Add layer" title="Add layer">+</button>
+          <button id="delete-layer" type="button" aria-label="Delete selected layer" title="Delete selected layer">−</button>
+          <button id="raise-layer" type="button" aria-label="Move layer up" title="Move layer up">↑</button>
+          <button id="lower-layer" type="button" aria-label="Move layer down" title="Move layer down">↓</button>
+        </div>
+
+        <div class="layer-list" role="group" aria-label="Layers"></div>
+
+        <button id="rename-layer" type="button">Rename layer</button>
+
+        <input
+          id="layer-name-input"
+          type="text"
+          maxlength="40"
+          aria-label="Layer name"
+          hidden
+        >
+      </section>
+    </aside>
+  </div>
+
+  <p id="status" class="sr-only" role="status" aria-live="polite"></p>
+</div>
+
+<div class="blocks-overlay" id="blocks-overlay" hidden>
+  <section
+    class="blocks-window"
+    id="blocks-dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="blocks-title"
+    tabindex="-1"
+  >
+    <header class="blocks-header">
+      <h2 id="blocks-title">Blocks</h2>
+      <button id="close-blocks" type="button" aria-label="Close blocks">×</button>
+    </header>
+
+    <div class="blocks-grid-area">
+      <div class="blocks-grid" role="group" aria-label="Available blocks"></div>
+    </div>
+  </section>
+</div>
+
+<div id="cursor" aria-hidden="true">
+  <div class="cursor-art">
+    <img class="cursor-image" data-kind="arrow" src="mouse.png" alt="" draggable="false">
+    <img class="cursor-image" data-kind="hand" src="mouse_hand.png" alt="" draggable="false">
+    <img class="cursor-image" data-kind="draw" src="draw_hand.png" alt="" draggable="false">
+    <span class="cursor-fallback"></span>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  /* =======================================================
+     CONFIGURATION
+
+     Required assets:
+       index.html
+       background.png
+       mouse.png
+       mouse_hand.png
+       draw_hand.png
+       Blocks/
+         Blocks000.png
+         ...
+         Blocks596.png
+
+     For filenames such as Blocks0.png:
+       change filenameDigits to 1.
+
+     Background:
+       Repeats inside the comic at 16× source size.
+       Included in exports.
+     ======================================================= */
+
+  const CONFIG = {
+    columns: 240,
+    rows: 27,
+    cellSize: 16,
+
+    blockCount: 597,
+    folder: "Blocks",
+    filenamePrefix: "Blocks",
+    filenameDigits: 3,
+    extension: ".png",
+
+    background: "background.png",
+    backgroundScale: 1,
+
+    exportFilename: "comic.png",
+    storageKey: "comic-creator-project-v1",
+    historyLimit: 100
+  };
+
+  const W = CONFIG.columns * CONFIG.cellSize;
+  const H = CONFIG.rows * CONFIG.cellSize;
+  const S = CONFIG.cellSize;
+  const C = CONFIG.columns;
+  const $ = selector => document.querySelector(selector);
+
+  const app = $("#app");
+  const canvas = $("canvas");
+  const ctx = canvas.getContext("2d");
+  const palette = $(".palette");
+  const status = $("#status");
+  const guides = $("#guides");
+  const viewport = $(".viewport");
+  const canvasSlider = $("#canvas-slider");
+  const sliderTray = $("#slider-tray");
+  const trayToggle = $("#tray-toggle");
+  const undoButton = $("#undo");
+  const redoButton = $("#redo");
+  const paintButton = $("#paint");
+  const eraserButton = $("#eraser");
+  const moreBlocks = $("#more-blocks");
+  const overlay = $("#blocks-overlay");
+  const dialog = $("#blocks-dialog");
+  const closeBlocks = $("#close-blocks");
+  const blockGrid = $(".blocks-grid");
+  const layerList = $(".layer-list");
+  const nameInput = $("#layer-name-input");
+
+  canvas.width = W;
+  canvas.height = H;
+  ctx.imageSmoothingEnabled = false;
+
+  /* =======================================================
+     BLOCK CATALOG
+     Stable IDs keep saves compatible with filename changes.
+     ======================================================= */
+
+  const catalog = new Map();
+  const imageCache = new Map();
+
+  for (let index = 0; index < CONFIG.blockCount; index++) {
+    const stableNumber = String(index).padStart(3, "0");
+    const fileNumber = String(index).padStart(CONFIG.filenameDigits, "0");
+    const id = `block-${stableNumber}`;
+
+    catalog.set(id, {
+      id,
+      number: stableNumber,
+      name: `Block ${stableNumber}`,
+      src: `${CONFIG.folder}/${CONFIG.filenamePrefix}${fileNumber}${CONFIG.extension}`
+    });
+  }
+
+  function validBlock(id) {
+    return catalog.has(id) || /^color-[0-9a-f]{6}$/i.test(id);
+  }
+
+  function tileImage(id) {
+    if (imageCache.has(id)) return imageCache.get(id);
+    const block = catalog.get(id);
+    if (!block) return null;
+
+    const item = {
+      image: new Image(),
+      ready: false,
+      failed: false,
+      promise: null
+    };
+
+    item.promise = new Promise(resolve => {
+      item.image.onload = () => {
+        item.ready = true;
+        render();
+        resolve(item);
+      };
+
+      item.image.onerror = () => {
+        item.failed = true;
+        render();
+        resolve(item);
+      };
+    });
+
+    imageCache.set(id, item);
+    item.image.src = block.src;
+    return item;
+  }
+
+  function previewImage(block) {
+    const image = document.createElement("img");
+    image.className = "tile-image";
+    image.src = block.src;
+    image.alt = "";
+    image.loading = "lazy";
+    image.draggable = false;
+
+    image.onerror = () => {
+      const fallback = document.createElement("span");
+      fallback.className = "missing-tile";
+      fallback.textContent = block.number;
+      image.replaceWith(fallback);
+    };
+
+    return image;
+  }
+
+  /* =======================================================
+     PROJECT STATE
+     Layers are stored bottom-to-top.
+     ======================================================= */
+
+  function newLayer(name) {
+    return {
+      id: `layer-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+      name,
+      visible: true,
+      cells: new Map()
+    };
+  }
+
+  let layers = [newLayer("Layer 1")];
+  let activeLayerId = layers[0].id;
+  let selectedId = "block-000";
+  let quickIds = [...catalog.keys()].slice(0, 18);
+  let tool = "paint";
+  let stroke = null;
+  let undos = [], redos = [];
+  let renderPending = false, fitPending = false, quickPending = false;
+  let startup = true, dirty = false, saveTimer = null;
+  let restoredLeft = null, restoredTray = false;
+  let exporting = false, renameTarget = null;
+
+  const activeLayer = () => layers.find(layer => layer.id === activeLayerId);
+
+  /* =======================================================
+     AUTOMATIC SAVING
+     Undo history is session-only.
+     ======================================================= */
+
+  function serializeLayers() {
+    return layers.map(layer => ({
+      id: layer.id,
+      name: layer.name,
+      visible: layer.visible,
+      cells: [...layer.cells]
+    }));
+  }
+
+  function decodeLayers(data) {
+    const result = [];
+    const ids = new Set();
+
+    if (!Array.isArray(data)) return result;
+
+    for (const item of data) {
+      if (!item || typeof item.id !== "string" || ids.has(item.id)) continue;
+      ids.add(item.id);
+
+      const layer = {
+        id: item.id,
+        name: String(item.name || "Layer").slice(0, 40),
+        visible: item.visible !== false,
+        cells: new Map()
+      };
+
+      if (Array.isArray(item.cells)) {
+        for (const entry of item.cells) {
+          if (!Array.isArray(entry) || entry.length !== 2) continue;
+          const [key, id] = entry;
+
+          if (
+            Number.isInteger(key) &&
+            key >= 0 && key < C * CONFIG.rows &&
+            typeof id === "string" && validBlock(id)
+          ) layer.cells.set(key, id);
+        }
+      }
+
+      result.push(layer);
+    }
+
+    return result;
+  }
+
+  function logicalLeft() {
+    if (restoredLeft !== null) return restoredLeft;
+    const width = canvas.getBoundingClientRect().width;
+    return width ? viewport.scrollLeft * W / width : 0;
+  }
+
+  function saveNow() {
+    clearTimeout(saveTimer);
+    if (startup || !dirty) return;
+
+    const savedLayers = serializeLayers();
+
+    if (stroke) {
+      const saved = savedLayers.find(layer => layer.id === stroke.layerId);
+
+      if (saved) {
+        const committed = new Map(saved.cells);
+        for (const [key, oldId] of stroke.before) {
+          if (oldId === null) committed.delete(key);
+          else committed.set(key, oldId);
+        }
+        saved.cells = [...committed];
+      }
+    }
+
+    try {
+      localStorage.setItem(CONFIG.storageKey, JSON.stringify({
+        version: 2,
+        columns: C,
+        rows: CONFIG.rows,
+        cellSize: S,
+        layers: savedLayers,
+        activeLayerId,
+        selectedId,
+        quickIds,
+        tool,
+        guides: guides.checked,
+        trayOpen: sliderTray.classList.contains("open"),
+        logicalLeft: logicalLeft()
+      }));
+
+      dirty = false;
+    } catch (error) {
+      status.textContent = "Automatic saving failed. Export a copy of your comic.";
+    }
+  }
+
+  function scheduleSave() {
+    if (startup) return;
+    dirty = true;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveNow, 180);
+  }
+
+  function restoreProject() {
+    try {
+      const raw = localStorage.getItem(CONFIG.storageKey);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+
+      if (
+        saved.columns !== C ||
+        saved.rows !== CONFIG.rows ||
+        saved.cellSize !== S
+      ) return;
+
+      let restored = [];
+
+      if (saved.version === 2) {
+        restored = decodeLayers(saved.layers);
+      } else if (saved.version === 1 && Array.isArray(saved.cells)) {
+        restored = decodeLayers([{
+          id: "legacy-layer",
+          name: "Layer 1",
+          visible: true,
+          cells: saved.cells
+        }]);
+      } else {
+        return;
+      }
+
+      if (restored.length) layers = restored;
+
+      activeLayerId = layers.some(layer => layer.id === saved.activeLayerId)
+        ? saved.activeLayerId : layers[layers.length - 1].id;
+
+      if (catalog.has(saved.selectedId)) selectedId = saved.selectedId;
+
+      if (Array.isArray(saved.quickIds)) {
+        const ids = [...new Set(saved.quickIds.filter(id => catalog.has(id)))];
+        if (ids.length) quickIds = ids;
+      }
+
+      if (!quickIds.includes(selectedId)) quickIds.unshift(selectedId);
+
+      tool = saved.tool === "erase" ? "erase" : "paint";
+      if (typeof saved.guides === "boolean") guides.checked = saved.guides;
+      restoredTray = saved.trayOpen === true;
+
+      if (Number.isFinite(saved.logicalLeft)) {
+        restoredLeft = Math.max(0, Math.min(W, saved.logicalLeft));
+      }
+
+      status.textContent = "Saved project restored.";
+    } catch (error) {
+      status.textContent = "Saved project could not be restored.";
+    }
+  }
+
+  /* =======================================================
+     HISTORY
+     ======================================================= */
+
+  function stackSnapshot() {
+    return { layers: serializeLayers(), activeLayerId };
+  }
+
+  function restoreStack(snapshot) {
+    layers = decodeLayers(snapshot.layers);
+    activeLayerId = snapshot.activeLayerId;
+    if (!activeLayer()) activeLayerId = layers[0].id;
+  }
+
+  function pushHistory(action) {
+    undos.push(action);
+    if (undos.length > CONFIG.historyLimit) undos.shift();
+    redos = [];
+    controls();
+    scheduleSave();
+  }
+
+  function changeLayers(callback) {
+    if (stroke || exporting) return;
+    const before = stackSnapshot();
+    callback();
+    const after = stackSnapshot();
+
+    if (JSON.stringify(before) !== JSON.stringify(after)) {
+      pushHistory({ type: "stack", before, after });
+      renderLayers();
+      render();
+    }
+  }
+
+  function applyCells(layer, changes) {
+    for (const [key, id] of changes) {
+      if (id === null) layer.cells.delete(key);
+      else layer.cells.set(key, id);
+    }
+  }
+
+  function applyHistory(action, direction) {
+    if (action.type === "stack") {
+      restoreStack(action[direction]);
+    } else {
+      const layer = layers.find(item => item.id === action.layerId);
+      if (layer) applyCells(layer, action[direction]);
+    }
+
+    renderLayers();
+    render();
+    scheduleSave();
+  }
+
+  function undo() {
+    if (stroke || exporting || !undos.length) return;
+    const action = undos.pop();
+    applyHistory(action, "before");
+    redos.push(action);
+    controls();
+  }
+
+  function redo() {
+    if (stroke || exporting || !redos.length) return;
+    const action = redos.pop();
+    applyHistory(action, "after");
+    undos.push(action);
+    controls();
+  }
+
+  /* =======================================================
+     LAYERS
+     ======================================================= */
+
+  function renderLayers() {
+    layerList.replaceChildren();
+
+    [...layers].reverse().forEach(layer => {
+      const item = document.createElement("div");
+      item.className = "layer-item";
+      item.classList.toggle("active", layer.id === activeLayerId);
+      item.classList.toggle("layer-hidden", !layer.visible);
+
+      const eye = document.createElement("button");
+      eye.type = "button";
+      eye.className = "layer-eye";
+      eye.textContent = layer.visible ? "●" : "○";
+      eye.title = layer.visible ? "Hide layer" : "Show layer";
+      eye.setAttribute("aria-label", `${eye.title}: ${layer.name}`);
+      eye.setAttribute("aria-pressed", String(layer.visible));
+      eye.onclick = () => changeLayers(() => { layer.visible = !layer.visible; });
+
+      const name = document.createElement("button");
+      name.type = "button";
+      name.className = "layer-name";
+      name.textContent = layer.name;
+      name.title = layer.name;
+      name.setAttribute("aria-pressed", String(layer.id === activeLayerId));
+
+      name.onclick = () => {
+        if (stroke || exporting) return;
+        activeLayerId = layer.id;
+        nameInput.hidden = true;
+        renderLayers();
+        scheduleSave();
+      };
+
+      item.append(eye, name);
+      layerList.appendChild(item);
+    });
+
+    controls();
+  }
+
+  $("#add-layer").onclick = () => changeLayers(() => {
+    const layer = newLayer(`Layer ${layers.length + 1}`);
+    const index = layers.findIndex(item => item.id === activeLayerId);
+    layers.splice(index + 1, 0, layer);
+    activeLayerId = layer.id;
+  });
+
+  $("#delete-layer").onclick = () => {
+    if (layers.length <= 1) return;
+
+    changeLayers(() => {
+      const index = layers.findIndex(layer => layer.id === activeLayerId);
+      layers.splice(index, 1);
+      activeLayerId = layers[Math.min(index, layers.length - 1)].id;
+    });
+  };
+
+  function moveLayer(direction) {
+    const index = layers.findIndex(layer => layer.id === activeLayerId);
+    const target = index + direction;
+    if (target < 0 || target >= layers.length) return;
+
+    changeLayers(() => {
+      [layers[index], layers[target]] = [layers[target], layers[index]];
+    });
+  }
+
+  $("#raise-layer").onclick = () => moveLayer(1);
+  $("#lower-layer").onclick = () => moveLayer(-1);
+
+  $("#rename-layer").onclick = () => {
+    if (stroke || exporting) return;
+    renameTarget = activeLayerId;
+    nameInput.value = activeLayer().name;
+    nameInput.hidden = false;
+    nameInput.focus();
+    nameInput.select();
+  };
+
+  function finishRename() {
+    if (nameInput.hidden) return;
+    const name = nameInput.value.trim().slice(0, 40);
+    nameInput.hidden = true;
+    const layer = layers.find(item => item.id === renameTarget);
+
+    if (layer && name && name !== layer.name) {
+      changeLayers(() => { layer.name = name; });
+    }
+  }
+
+  nameInput.addEventListener("blur", finishRename);
+
+  nameInput.addEventListener("keydown", event => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      finishRename();
+      $("#rename-layer").focus();
+    } else if (event.key === "Escape") {
+      nameInput.hidden = true;
+      $("#rename-layer").focus();
+    }
+  });
+
+  /* =======================================================
+     TOOLS AND QUICK BAR
+     ======================================================= */
+
+  function setTool(value) {
+    if (stroke || exporting) return;
+    tool = value;
+    controls();
+    updateSelection();
+    scheduleSave();
+  }
+
+  paintButton.onclick = () => setTool("paint");
+  eraserButton.onclick = () => setTool("erase");
+
+  function capacity() {
+    const style = getComputedStyle(palette);
+    const gap = parseFloat(style.columnGap) || 0;
+    const padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+    const size = matchMedia("(max-height: 450px)").matches
+      ? 32 : matchMedia("(max-width: 640px)").matches ? 36 : 44;
+
+    return Math.max(0, Math.floor(
+      (palette.clientWidth - padding + gap) / (size + gap)
+    ));
+  }
+
+  function updateSelection() {
+    document.querySelectorAll("[data-block-id]").forEach(button => {
+      button.setAttribute("aria-pressed", String(
+        tool === "paint" && button.dataset.blockId === selectedId
+      ));
+    });
+  }
+
+  function choose(id, rebuild = true) {
+    if (!catalog.has(id) || stroke || exporting) return;
+    selectedId = id;
+    setTool("paint");
+    tileImage(id);
+    if (rebuild) renderQuickBar();
+    updateSelection();
+    scheduleSave();
+  }
+
+  function renderQuickBar() {
+    if (stroke) return;
+    const count = capacity();
+    const index = quickIds.indexOf(selectedId);
+
+    if (count > 0) {
+      if (index < 0) {
+        quickIds.splice(Math.min(count - 1, quickIds.length), 0, selectedId);
+      } else if (index >= count) {
+        [quickIds[count - 1], quickIds[index]] =
+          [quickIds[index], quickIds[count - 1]];
+      }
+    }
+
+    palette.replaceChildren();
+
+    quickIds.slice(0, count).forEach(id => {
+      const block = catalog.get(id);
+      if (!block) return;
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "swatch";
+      button.dataset.blockId = id;
+      button.title = block.name;
+      button.setAttribute("aria-label", block.name);
+      button.appendChild(previewImage(block));
+
+      button.onclick = () => choose(id);
+
+      button.onpointerdown = event => {
+        if (event.button !== 0 || stroke || exporting) return;
+        event.preventDefault();
+        choose(id, false);
+        beginStroke(event);
+      };
+
+      palette.appendChild(button);
+    });
+
+    updateSelection();
+  }
+
+  function scheduleQuickBar() {
+    if (quickPending) return;
+    quickPending = true;
+    requestAnimationFrame(() => {
+      quickPending = false;
+      renderQuickBar();
+    });
+  }
+
+  /* =======================================================
+     BLOCK PICKER
+     ======================================================= */
+
+  let pickerBuilt = false;
+
+  function buildPicker() {
+    if (pickerBuilt) return;
+    pickerBuilt = true;
+
+    const fragment = document.createDocumentFragment();
+
+    for (const block of catalog.values()) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "block-slot";
+      button.dataset.blockId = block.id;
+      button.title = `${block.name} — ${block.src}`;
+      button.setAttribute("aria-label", block.name);
+      button.appendChild(previewImage(block));
+
+      button.onclick = () => {
+        choose(block.id);
+        closePicker();
+      };
+
+      fragment.appendChild(button);
+    }
+
+    blockGrid.appendChild(fragment);
+  }
+
+  function openPicker() {
+    if (stroke || exporting) return;
+    buildPicker();
+    updateSelection();
+    overlay.hidden = false;
+    app.setAttribute("inert", "");
+    moreBlocks.setAttribute("aria-expanded", "true");
+    closeBlocks.focus();
+    if (cursorVisible) updateCursorTarget();
+  }
+
+  function closePicker() {
+    overlay.hidden = true;
+    app.removeAttribute("inert");
+    moreBlocks.setAttribute("aria-expanded", "false");
+    moreBlocks.focus();
+    if (cursorVisible) updateCursorTarget();
+  }
+
+  moreBlocks.onclick = openPicker;
+  closeBlocks.onclick = closePicker;
+
+  overlay.addEventListener("click", event => {
+    if (event.target === overlay) closePicker();
+  });
+
+  dialog.addEventListener("keydown", event => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closePicker();
+      return;
+    }
+
+    if (event.key !== "Tab") return;
+    const buttons = [...dialog.querySelectorAll("button")];
+    const first = buttons[0], last = buttons[buttons.length - 1];
+
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
+
+  /* =======================================================
+     TILED BACKGROUND
+
+     Original image pixels are enlarged 16×.
+     The pattern repeats in both directions.
+     The same function is used for editor and export.
+     ======================================================= */
+
+  const background = new Image();
+  let backgroundReady = false;
+
+  const backgroundPromise = new Promise(resolve => {
+    background.onload = () => {
+      backgroundReady = true;
+      render();
+      resolve(true);
+    };
+
+    background.onerror = () => {
+      status.textContent = "Could not load background.png.";
+      resolve(false);
+    };
+  });
+
+  function drawBackground(context) {
+    if (!backgroundReady) return;
+
+    const pattern = context.createPattern(background, "repeat");
+    if (!pattern) return;
+
+    const scale = CONFIG.backgroundScale;
+
+    context.save();
+    context.imageSmoothingEnabled = false;
+    context.scale(scale, scale);
+    context.fillStyle = pattern;
+    context.fillRect(0, 0, W / scale, H / scale);
+    context.restore();
+  }
+
+  /* =======================================================
+     RENDERING
+     ======================================================= */
+
+  function controls() {
+    undoButton.disabled = !undos.length;
+    redoButton.disabled = !redos.length;
+
+    const index = layers.findIndex(layer => layer.id === activeLayerId);
+    $("#delete-layer").disabled = layers.length <= 1;
+    $("#raise-layer").disabled = index === layers.length - 1;
+    $("#lower-layer").disabled = index <= 0;
+
+    paintButton.setAttribute("aria-pressed", String(tool === "paint"));
+    eraserButton.setAttribute("aria-pressed", String(tool === "erase"));
+  }
+
+  function draw(context, showGrid) {
+    context.save();
+    context.imageSmoothingEnabled = false;
+    context.fillStyle = "white";
+    context.fillRect(0, 0, W, H);
+
+    drawBackground(context);
+
+    for (const layer of layers) {
+      if (!layer.visible) continue;
+
+      for (const [key, id] of layer.cells) {
+        const x = (key % C) * S;
+        const y = Math.floor(key / C) * S;
+
+        if (/^color-[0-9a-f]{6}$/i.test(id)) {
+          context.fillStyle = `#${id.slice(6)}`;
+          context.fillRect(x, y, S, S);
+          continue;
+        }
+
+        const item = tileImage(id);
+
+        if (item?.ready) {
+          context.drawImage(item.image, x, y, S, S);
+        } else {
+          context.fillStyle = item?.failed ? "#da7c9c" : "#b5bfd0";
+          context.fillRect(x, y, S, S);
+        }
+      }
+    }
+
+    if (showGrid) {
+      context.strokeStyle = "#b6c0ce80";
+      context.lineWidth = 1;
+      context.beginPath();
+
+      for (let x = 0; x < W; x += S) {
+        context.moveTo(x + .5, 0);
+        context.lineTo(x + .5, H);
+      }
+
+      for (let y = 0; y < H; y += S) {
+        context.moveTo(0, y + .5);
+        context.lineTo(W, y + .5);
+      }
+
+      context.stroke();
+    }
+
+    context.restore();
+  }
+
+  function render() {
+    controls();
+    if (renderPending) return;
+    renderPending = true;
+
+    requestAnimationFrame(() => {
+      renderPending = false;
+      draw(ctx, guides.checked);
+    });
+  }
+
+  /* =======================================================
+     POINTER PAINTING AND ERASING
+     ======================================================= */
+
+  function point(event) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (event.clientX - rect.left) * W / rect.width,
+      y: (event.clientY - rect.top) * H / rect.height
+    };
+  }
+
+  function beginStroke(event) {
+    const layer = activeLayer();
+    if (!layer || stroke || exporting) return;
+
+    if (!layer.visible) {
+      status.textContent = "Show the selected layer before drawing on it.";
+      return;
+    }
+
+    stroke = {
+      id: event.pointerId,
+      layerId: layer.id,
+      blockId: tool === "erase" ? null : selectedId,
+      before: new Map(),
+      last: null
+    };
+
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function dab(x, y) {
+    const layer = layers.find(item => item.id === stroke.layerId);
+    const key = y * C + x;
+
+    if (!stroke.before.has(key)) {
+      stroke.before.set(key, layer.cells.get(key) ?? null);
+    }
+
+    if (stroke.blockId === null) layer.cells.delete(key);
+    else layer.cells.set(key, stroke.blockId);
+  }
+
+  function line(a, b) {
+    let x = a.x, y = a.y;
+    const dx = Math.abs(b.x - x), dy = -Math.abs(b.y - y);
+    const sx = x < b.x ? 1 : -1, sy = y < b.y ? 1 : -1;
+    let error = dx + dy;
+
+    while (true) {
+      dab(x, y);
+      if (x === b.x && y === b.y) break;
+      const doubled = 2 * error;
+      if (doubled >= dy) { error += dy; x += sx; }
+      if (doubled <= dx) { error += dx; y += sy; }
+    }
+  }
+
+  function paint(event) {
+    if (!stroke || stroke.id !== event.pointerId) return;
+    const samples = event.getCoalescedEvents ? event.getCoalescedEvents() : [];
+
+    for (const sample of [...samples, event]) {
+      const p = point(sample);
+
+      if (p.x < 0 || p.y < 0 || p.x >= W || p.y >= H) {
+        stroke.last = null;
+        continue;
+      }
+
+      const cell = { x: Math.floor(p.x / S), y: Math.floor(p.y / S) };
+      line(stroke.last || cell, cell);
+      stroke.last = cell;
+    }
+
+    render();
+    if (cursorVisible) updateCursorTarget();
+  }
+
+  canvas.onpointerdown = event => {
+    if (event.button !== 0 || stroke || exporting || !overlay.hidden) return;
+    event.preventDefault();
+    beginStroke(event);
+    paint(event);
+  };
+
+  document.addEventListener("pointermove", paint);
+
+  document.addEventListener("pointerup", event => {
+    if (!stroke || stroke.id !== event.pointerId) return;
+    paint(event);
+
+    const finished = stroke;
+    stroke = null;
+
+    const layer = layers.find(item => item.id === finished.layerId);
+    const before = new Map(), after = new Map();
+
+    for (const [key, oldId] of finished.before) {
+      const now = layer.cells.get(key) ?? null;
+      if (oldId !== now) {
+        before.set(key, oldId);
+        after.set(key, now);
+      }
+    }
+
+    if (before.size) {
+      pushHistory({
+        type: "cells",
+        layerId: layer.id,
+        before,
+        after
+      });
+    }
+
+    cursor.classList.remove("drawing");
+    scheduleQuickBar();
+    if (cursorVisible) updateCursorTarget();
+  });
+
+  function cancelStroke() {
+    if (!stroke) return;
+    const layer = layers.find(item => item.id === stroke.layerId);
+    if (layer) applyCells(layer, stroke.before);
+    stroke = null;
+    cursor.classList.remove("drawing", "pressed");
+    render();
+    scheduleQuickBar();
+  }
+
+  ["pointercancel", "lostpointercapture"].forEach(name => {
+    document.addEventListener(name, event => {
+      if (stroke?.id === event.pointerId) cancelStroke();
+    });
+  });
+
+  window.addEventListener("blur", cancelStroke);
+
+  /* =======================================================
+     VIEWPORT AND SLIDER
+     ======================================================= */
+
+  function syncSlider() {
+    const maximum = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+    canvasSlider.max = String(maximum);
+    canvasSlider.value = String(viewport.scrollLeft);
+    canvasSlider.disabled = maximum === 0;
+  }
+
+  function fitCanvas() {
+    const style = getComputedStyle(viewport);
+    const height = Math.max(
+      1,
+      viewport.clientHeight -
+      parseFloat(style.paddingTop) -
+      parseFloat(style.paddingBottom)
+    );
+
+    const left = logicalLeft();
+    const width = W * height / H;
+
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    viewport.scrollLeft = left * width / W;
+    restoredLeft = null;
+
+    if (stroke) stroke.last = null;
+    syncSlider();
+    if (cursorVisible) updateCursorTarget();
+  }
+
+  function scheduleFit() {
+    if (fitPending) return;
+    fitPending = true;
+
+    requestAnimationFrame(() => {
+      fitPending = false;
+      fitCanvas();
+    });
+  }
+
+  canvasSlider.addEventListener("input", () => {
+    viewport.scrollLeft = Number(canvasSlider.value);
+    scheduleSave();
+  });
+
+  viewport.addEventListener("scroll", () => {
+    syncSlider();
+    scheduleSave();
+  }, { passive: true });
+
+  window.addEventListener("resize", () => {
+    scheduleFit();
+    scheduleQuickBar();
+  });
+
+  window.visualViewport?.addEventListener("resize", scheduleFit);
+
+  if ("ResizeObserver" in window) {
+    const viewObserver = new ResizeObserver(scheduleFit);
+    viewObserver.observe(viewport);
+
+    const barObserver = new ResizeObserver(scheduleQuickBar);
+    barObserver.observe(palette);
+  }
+
+  function setTray(open) {
+    if (!open && sliderTray.contains(document.activeElement)) trayToggle.focus();
+
+    sliderTray.classList.toggle("open", open);
+    sliderTray.setAttribute("aria-hidden", String(!open));
+    sliderTray.toggleAttribute("inert", !open);
+    trayToggle.setAttribute("aria-expanded", String(open));
+    canvasSlider.tabIndex = open ? 0 : -1;
+
+    scheduleFit();
+    scheduleSave();
+  }
+
+  trayToggle.onclick = () => setTray(!sliderTray.classList.contains("open"));
+  sliderTray.addEventListener("transitionend", scheduleFit);
+
+  sliderTray.addEventListener("keydown", event => {
+    if (event.key === "Escape") {
+      setTray(false);
+      trayToggle.focus();
+    }
+  });
+
+  /* =======================================================
+     CUSTOM CURSOR
+     ======================================================= */
+
+  const hotspots = {
+    arrow: { x: 2, y: 2 },
+    hand: { x: 12, y: 3 },
+    draw: { x: 5, y: 30 }
+  };
+
+  const cursor = $("#cursor");
+  const cursorImages = [...cursor.querySelectorAll(".cursor-image")];
+  const mouseAvailable = matchMedia("(any-hover: hover) and (any-pointer: fine)");
+
+  let cursorKind = "", cursorX = 0, cursorY = 0, cursorVisible = false;
+
+  function checkCursor() {
+    const image = cursorImages.find(item => item.dataset.kind === cursorKind);
+    cursor.classList.toggle(
+      "missing",
+      !!image && image.complete && image.naturalWidth === 0
+    );
+  }
+
+  function updateCursorTarget() {
+    const target = document.elementFromPoint(cursorX, cursorY);
+    let kind = "arrow";
+
+    if (target === canvas) kind = "draw";
+    else if (target?.closest("button:not(:disabled), label, input, a")) kind = "hand";
+
+    if (kind !== cursorKind) {
+      cursorKind = kind;
+
+      cursorImages.forEach(image => {
+        image.classList.toggle("active", image.dataset.kind === kind);
+      });
+
+      cursor.style.setProperty("--hot-x", hotspots[kind].x);
+      cursor.style.setProperty("--hot-y", hotspots[kind].y);
+      checkCursor();
+    }
+
+    cursor.classList.toggle("drawing", !!stroke && target === canvas);
+  }
+
+  cursorImages.forEach(image => {
+    image.addEventListener("load", checkCursor);
+    image.addEventListener("error", checkCursor);
+  });
+
+  function hideCursor() {
+    cursorVisible = false;
+    cursor.classList.remove("visible", "pressed", "drawing");
+    document.documentElement.classList.remove("custom-cursor");
+  }
+
+  function trackCursor(event) {
+    if (event.pointerType !== "mouse" || !mouseAvailable.matches) {
+      if (event.pointerType !== "mouse") hideCursor();
+      return;
+    }
+
+    cursorX = event.clientX;
+    cursorY = event.clientY;
+    cursor.style.transform = `translate3d(${cursorX}px, ${cursorY}px, 0)`;
+    cursorVisible = true;
+    cursor.classList.add("visible");
+    document.documentElement.classList.add("custom-cursor");
+    updateCursorTarget();
+  }
+
+  document.addEventListener("pointermove", trackCursor, { passive: true });
+
+  document.addEventListener("pointerdown", event => {
+    trackCursor(event);
+    if (event.pointerType === "mouse" && cursorVisible && event.button === 0) {
+      cursor.classList.add("pressed");
+    }
+  }, true);
+
+  ["pointerup", "pointercancel"].forEach(name => {
+    document.addEventListener(name, () => {
+      cursor.classList.remove("pressed", "drawing");
+    }, true);
+  });
+
+  document.documentElement.addEventListener("pointerleave", hideCursor);
+  window.addEventListener("blur", hideCursor);
+
+  document.addEventListener("scroll", () => {
+    if (cursorVisible) updateCursorTarget();
+  }, true);
+
+  mouseAvailable.addEventListener("change", () => {
+    if (!mouseAvailable.matches) hideCursor();
+  });
+
+  /* =======================================================
+     CONTROLS AND EXPORT
+     ======================================================= */
+
+  undoButton.onclick = undo;
+  redoButton.onclick = redo;
+
+  guides.onchange = () => {
+    render();
+    scheduleSave();
+  };
+
+  $("#clear").onclick = () => {
+    const layer = activeLayer();
+    if (!layer || stroke || exporting || !layer.cells.size) return;
+
+    const before = new Map(layer.cells);
+    const after = new Map([...layer.cells.keys()].map(key => [key, null]));
+    layer.cells.clear();
+
+    pushHistory({
+      type: "cells",
+      layerId: layer.id,
+      before,
+      after
+    });
+
+    render();
+    status.textContent = "Selected layer cleared. Undo restores it.";
+  };
+
+  document.addEventListener("keydown", event => {
+    if (!overlay.hidden) return;
+
+    const target = event.target;
+    if (
+      target.isContentEditable ||
+      /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)
+    ) return;
+
+    if (
+      (event.ctrlKey || event.metaKey) &&
+      !event.altKey &&
+      event.key.toLowerCase() === "z"
+    ) {
+      event.preventDefault();
+      if (event.shiftKey) redo();
+      else undo();
+    } else if (!event.ctrlKey && !event.metaKey && !event.altKey) {
+      if (event.key.toLowerCase() === "e") setTool("erase");
+      if (event.key.toLowerCase() === "b") setTool("paint");
+    }
+  });
+
+  $("#save").onclick = async () => {
+    if (stroke || exporting) return;
+    exporting = true;
+    status.textContent = "Preparing comic.";
+
+    try {
+      if (!await backgroundPromise) {
+        throw new Error("Background could not be loaded.");
+      }
+
+      const used = new Set();
+
+      for (const layer of layers) {
+        if (!layer.visible) continue;
+        for (const id of layer.cells.values()) {
+          if (catalog.has(id)) used.add(id);
+        }
+      }
+
+      const loaded = await Promise.all(
+        [...used].map(id => tileImage(id).promise)
+      );
+
+      if (loaded.some(item => item.failed)) {
+        throw new Error("A used block image could not be loaded.");
+      }
+
+      const output = document.createElement("canvas");
+      output.width = W;
+      output.height = H;
+
+      // Includes tiled background and visible layers.
+      // Excludes grid guides.
+      draw(output.getContext("2d"), false);
+
+      const blob = await new Promise((resolve, reject) => {
+        output.toBlob(value => {
+          if (value) resolve(value);
+          else reject(new Error("PNG creation failed."));
+        }, "image/png");
+      });
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = CONFIG.exportFilename;
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      status.textContent = "PNG prepared.";
+    } catch (error) {
+      status.textContent = `Export failed: ${error.message}`;
+    } finally {
+      exporting = false;
+    }
+  };
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      hideCursor();
+      cancelStroke();
+      saveNow();
+    }
+  });
+
+  window.addEventListener("pagehide", saveNow);
+
+  /* =======================================================
+     STARTUP
+     ======================================================= */
+
+  restoreProject();
+  background.src = CONFIG.background;
+
+  setTray(restoredTray);
+  renderLayers();
+  renderQuickBar();
+  updateSelection();
+  scheduleFit();
+  render();
+
+  startup = false;
+})();
+</script>
+</body>
+</html>
